@@ -315,7 +315,7 @@ def main():
         try:
             imagem, largura, altura = Ler_imagem(caminho)
         except Exception as e:
-            print(f"Erro: arquivo '{caminho}' não encontrado. Detalhes: {e}")
+            print(f"Erro ao ler o arquivo '{caminho}' ou não encontrado. Detalhes: {e}")
             return
         
         print(f'''Imagem lida: "{caminho}" (Largura: {largura}, Altura: {altura})''')
@@ -327,7 +327,7 @@ def main():
         imagem_erodida = erosao(imagam_sem_buracos, MASCARA)
         imagem_envoltoria = envoltoria(imagam_sem_buracos, imagem_erodida)
         
-        total_figuras = contar_figuras(imagem_envoltoria, MASCARA_BURACO)
+        total_figuras = contar_figuras(imagem_envoltoria, MASCARA)
         total_com_buracos = contar_figuras(imagem_apenas_buracos, MASCARA_BURACO)
         
         total_sem_buracos = total_figuras - total_com_buracos
