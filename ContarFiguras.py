@@ -1,6 +1,25 @@
 import sys
 
 def Ler_imagem(caminho):
+    """
+    Lê um arquivo PBM no formato P1 (ASCII) e converte em uma matriz binária.
+
+    Remove comentários e espaços extras, valida o cabeçalho do arquivo
+    e garante que a quantidade de pixels corresponde às dimensões informadas.
+
+    Args:
+        caminho (str): Caminho para o arquivo PBM.
+
+    Returns:
+        tuple:
+            matriz (list[list[int]]): Matriz 2D com valores 0 e 1.
+            largura (int): Largura da imagem.
+            altura (int): Altura da imagem.
+
+    Raises:
+        ValueError: Se o arquivo não for P1 válido ou estiver incompleto.
+        FileNotFoundError: Se o arquivo não existir.
+    """
     with open(caminho, "r") as arquivo:
         linhas = arquivo.readlines()
 
@@ -42,9 +61,35 @@ def Ler_imagem(caminho):
     return matriz, largura, altura
 
 def inverter(im):
+    """
+    Gera o negativo de uma imagem binária.
+
+    Troca todos os pixels 0 por 1 e 1 por 0.
+
+    Args:
+        im (list[list[int]]): Matriz binária da imagem.
+
+    Returns:
+        list[list[int]]: Nova matriz com valores invertidos.
+    """
+
     return [[1-p for p in linha] for linha in im]
 
-def dilatacao(imagem, mascara):
+def erosao(imagem, mascara):
+    """
+    Aplica a operação morfológica de erosão em imagem binária.
+
+    Um pixel permanece 1 somente se todos os pixels cobertos
+    pela máscara forem 1 na imagem original.
+
+    Args:
+        imagem (list[list[int]]): Matriz binária de entrada.
+        mascara (list[list[int]]): Elemento estruturante binário (ex: 3x3).
+
+    Returns:
+        list[list[int]]: Nova imagem erodida.
+    """
+
     altura = len(imagem)
     largura = len(imagem[0])
     
@@ -52,26 +97,40 @@ def dilatacao(imagem, mascara):
     
     for y in range(1, altura - 1):
         for x in range(1, largura - 1):
-            aplicar_dilatacao = False
+            aplicar_erosao = True
             for j in range(-1, 2):
                 for i in range(-1, 2):
-                    if mascara[j + 1][i + 1] == 1 and imagem[y + j][x + i] == 1:
-                        aplicar_dilatacao = True
-            if aplicar_dilatacao:
+                    if mascara[j + 1][i + 1] == 1 and imagem[y + j][x + i] == 0:
+                        aplicar_erosao = False
+            if aplicar_erosao:
                 nova_imagem[y][x] = 1
             else:
                 nova_imagem[y][x] = 0
 
     return nova_imagem
 
-def envoltoria(imagem, imagem_dilatada):
+def envoltoria(imagem, imagem_erodida):
+    """
+    Calcula a envoltória (contorno) dos objetos da imagem.
+
+    Obtém os pixels que pertencem à imagem original mas foram removidos
+    pela erosão — equivalente a borda morfológica.
+
+    Args:
+        imagem (list[list[int]]): Imagem binária original.
+        imagem_erodida (list[list[int]]): Imagem após erosão.
+
+    Returns:
+        list[list[int]]: Imagem contendo apenas o contorno dos objetos.
+    """
+
     altura = len(imagem)
     largura = len(imagem[0])
     nova_imagem = [[0 for _ in range(largura)] for _ in range(altura)] #Inicializa com zeros uma nova imagem
     
     for y in range(altura):
         for x in range(largura):
-            if imagem_dilatada[y][x] == 1 and imagem[y][x] == 0:
+            if imagem_erodida[y][x] == 0 and imagem[y][x] == 1:
                 nova_imagem[y][x] = 1
             else:
                 nova_imagem[y][x] = 0
@@ -81,6 +140,23 @@ def envoltoria(imagem, imagem_dilatada):
 
 
 def flood_fill_zero(imagem, x0, y0, mascara):
+    """
+    Executa flood fill apagando uma componente conectada.
+
+    A partir de uma posição inicial, percorre todos os pixels conectados
+    conforme a máscara de vizinhança e define seus valores como 0.
+
+    Implementação iterativa usando pilha (DFS).
+
+    Args:
+        imagem (list[list[int]]): Matriz binária (modificada in-place).
+        x0 (int): Coordenada x inicial.
+        y0 (int): Coordenada y inicial.
+        mascara (list[list[int]]): Máscara de conectividade (define vizinhos).
+
+    Returns:
+        None
+    """
 
     altura = len(imagem)
     largura = len(imagem[0])
@@ -119,6 +195,20 @@ def flood_fill_zero(imagem, x0, y0, mascara):
                 pilha.append((x + deslocamento_x, y + deslocamento_y))
 
 def remover_fundo(im, mascara):
+    """
+    Remove o fundo conectado às bordas da imagem.
+
+    Executa flood fill a partir das bordas para apagar regiões conectadas,
+    útil para separar buracos internos de fundo externo.
+
+    Args:
+        im (list[list[int]]): Imagem binária.
+        mascara (list[list[int]]): Máscara de conectividade.
+
+    Returns:
+        list[list[int]]: Nova imagem com o fundo removido.
+    """
+
     altura = len(im)
     largura = len(im[0])
 
@@ -139,6 +229,20 @@ def remover_fundo(im, mascara):
     return copia
 
 def apaga_buracos(imagem, imagem_buracos):
+    """
+    Preenche buracos internos em objetos binários.
+
+    Combina a imagem original com a imagem de buracos detectados,
+    marcando os pixels de buraco como pertencentes ao objeto.
+
+    Args:
+        imagem (list[list[int]]): Imagem original.
+        imagem_buracos (list[list[int]]): Máscara dos buracos.
+
+    Returns:
+        list[list[int]]: Imagem com buracos preenchidos.
+    """
+
     altura = len(imagem)
     largura = len(imagem[0])
     copia = [linha[:] for linha in imagem]
@@ -149,6 +253,20 @@ def apaga_buracos(imagem, imagem_buracos):
     return copia
 
 def contar_figuras(imagem, mascara):
+    """
+    Conta componentes conectados na imagem binária.
+
+    Percorre a imagem e aplica flood fill em cada novo pixel 1 encontrado,
+    incrementando o contador de objetos.
+
+    Args:
+        imagem (list[list[int]]): Imagem binária.
+        mascara (list[list[int]]): Máscara de conectividade.
+
+    Returns:
+        int: Número de componentes conectados encontrados.
+    """
+
     contador = 0
     imagem_copia = [linha[:] for linha in imagem]
     for x in range(len(imagem[0])):
@@ -158,39 +276,66 @@ def contar_figuras(imagem, mascara):
                 contador += 1
     return contador
 
-
 def main():
-    if len(sys.argv) != 2:
-        print("Número de argumentos inválido.")
-        print("Uso: python ContarFiguras.py <caminho_para_imagem.pbm>")
-        return
-    
-    caminho =  sys.argv[1]
-    imagem, largura, altura = Ler_imagem(caminho)
-    
+    """
+    Função principal do programa.
+
+    Processa imagens PBM fornecidas via linha de comando,
+    executa pipeline morfológico para:
+
+    - inverter imagem
+    - remover fundo
+    - preencher buracos
+    - calcular envoltória
+    - contar figuras totais
+    - contar figuras com e sem buracos
+
+    Lê múltiplos arquivos passados como argumento.
+
+    Returns:
+        None
+    """
+
     MASCARA =  [[1,1,1],
                 [1,1,1],
                 [1,1,1]]
     
     MASCARA_BURACO = [[0,1,0],
                       [1,1,1],
-                      [0,1,0]]
+                      [0,1,0]]    
     
-    imagem_negativo = inverter(imagem)
-    imagem_apenas_buracos = remover_fundo(imagem_negativo, MASCARA)
-    imagam_sem_buracos = apaga_buracos(imagem, imagem_apenas_buracos)
-    imagem_dilatada = dilatacao(imagam_sem_buracos, MASCARA)
-    imagem_envoltoria = envoltoria(imagam_sem_buracos, imagem_dilatada)
-    
-    total_figuras = contar_figuras(imagem_envoltoria, MASCARA_BURACO)
-    total_com_buracos = contar_figuras(imagem_apenas_buracos, MASCARA_BURACO)
-    
-    total_sem_buracos = total_figuras - total_com_buracos
-    
-    print(f"Total de figuras: {total_figuras}")
-    print(f"Total de figuras COM buracos: {total_com_buracos}")
-    print(f"Total de figuras SEM buracos: {total_sem_buracos}")
-    
+    if len(sys.argv) < 2:
+        print("Número de argumentos inválido.")
+        print("Uso: python ContarFiguras.py <caminho_para_imagem.pbm>")
+        return
+
+    for i in range(1, len(sys.argv)):
+        caminho = sys.argv[i]
+        
+        try:
+            imagem, largura, altura = Ler_imagem(caminho)
+        except Exception as e:
+            print(f"Erro: arquivo '{caminho}' não encontrado. Detalhes: {e}")
+            return
+        
+        print(f'''Imagem lida: "{caminho}" (Largura: {largura}, Altura: {altura})''')
+        print("Processando a imagem...")
+        
+        imagem_negativo = inverter(imagem)
+        imagem_apenas_buracos = remover_fundo(imagem_negativo, MASCARA)
+        imagam_sem_buracos = apaga_buracos(imagem, imagem_apenas_buracos)
+        imagem_erodida = erosao(imagam_sem_buracos, MASCARA)
+        imagem_envoltoria = envoltoria(imagam_sem_buracos, imagem_erodida)
+        
+        total_figuras = contar_figuras(imagem_envoltoria, MASCARA_BURACO)
+        total_com_buracos = contar_figuras(imagem_apenas_buracos, MASCARA_BURACO)
+        
+        total_sem_buracos = total_figuras - total_com_buracos
+        
+        print(f"Total de figuras: {total_figuras}")
+        print(f"Total de figuras COM buracos: {total_com_buracos}")
+        print(f"Total de figuras SEM buracos: {total_sem_buracos}")
+        
     
 if __name__ == "__main__":
     main()
